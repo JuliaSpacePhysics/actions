@@ -1,0 +1,50 @@
+name: 'Add Navbar Action'
+author: 'Shravan Goswami'
+description: 'Adds a top navigation bar to Documenter.jl-generated sites'
+inputs:
+  doc-path:
+    description: 'Path to the Documenter.jl output'
+    required: true
+  julia-version:
+    description: 'Julia version to use'
+    required: false
+    default: '1'
+  navbar-url:
+    description: 'URL or local path of the navbar HTML to be inserted.'
+    required: false
+    default: ''
+  exclude-paths:
+    # GitHub Actions doesn't allow array inputs, so the most robust way to
+    # handle this (i.e. avoiding weird delimiter / quotation issues) is to use
+    # a JSON string which we later parse using jq.
+    description: 'JSON array of filepath patterns to exclude from navbar insertion.'
+    required: false
+    default: '[]'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Julia (if needed)
+      uses: julia-actions/setup-julia@v2
+      with:
+        version: ${{ inputs.julia-version }}
+
+    - name: Update Navbar
+      working-directory: ${{ inputs.doc-path }}
+      run: |
+        # Check if navbar-url is empty and set accordingly
+        if [[ -z "${{ inputs.navbar-url }}" ]]; then
+          NAVBAR_URL="${{ github.action_path }}/scripts/TuringNavbar.html"
+        else
+          NAVBAR_URL="${{ inputs.navbar-url }}"
+        fi
+
+        readarray -t EXCLUDE_PATHS < <(echo '${{ inputs.exclude-paths }}' | jq -r '.[]')
+        # Check if array is empty
+        if (( ${#EXCLUDE_PATHS[@]} )); then
+          julia ${{ github.action_path }}/scripts/insert_navbar.jl . "${NAVBAR_URL}" --exclude "$EXCLUDE_PATHS[@]"
+        else
+          julia ${{ github.action_path }}/scripts/insert_navbar.jl . "${NAVBAR_URL}"
+        fi
+
+      shell: bash

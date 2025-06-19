@@ -1,0 +1,46 @@
+name: 'Build Documenter.jl site'
+author: 'JuliaSpacePhysics'
+description: 'Build and deploy Documenter.jl site, with a JuliaSpacePhysics navbar'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@v4
+    - uses: julia-actions/setup-julia@v2
+      with:
+        version: '1'
+    - uses: julia-actions/cache@v2
+    - name: Configure doc environment
+      shell: julia --project=docs --color=yes {0}
+      run: |
+        using Pkg
+        Pkg.develop(PackageSpec(path=pwd()))
+        Pkg.instantiate()
+    - uses: julia-actions/julia-buildpkg@v1
+    - uses: julia-actions/julia-docdeploy@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+    - name: Checkout gh-pages branch
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+        path: gh-pages
+    - name: Insert navbar
+      uses: TuringLang/actions/DocsNav@main
+      with:
+        doc-path: "gh-pages"
+        navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/juliaspacephysics.github.io/refs/heads/main/docs/Navbar.html"
+    - name: Commit and push changes
+      shell: bash
+      working-directory: gh-pages
+      run: |
+        if [[ -n $(git status -s) ]]; then
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Update navbar (automated)"
+          git push
+        else
+          echo "No changes to commit"
+        fi  
