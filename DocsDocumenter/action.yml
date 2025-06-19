@@ -29,7 +29,7 @@ runs:
       uses: TuringLang/actions/DocsNav@main
       with:
         doc-path: "gh-pages"
-        navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/juliaspacephysics.github.io/refs/heads/main/docs/Navbar.html"
+        navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/actions/refs/heads/main/Navbar.html"
     - name: Commit and push changes
       shell: bash
       working-directory: gh-pages
