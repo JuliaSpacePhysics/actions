@@ -6,6 +6,8 @@ runs:
   using: 'composite'
   steps:
     - uses: actions/checkout@v5
+      with:
+        clean: false
     - uses: julia-actions/setup-julia@v2
       with:
         version: '1'
