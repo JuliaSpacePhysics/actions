@@ -5,7 +5,7 @@ description: 'Build and deploy Documenter.jl site, with a JuliaSpacePhysics navb
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         clean: false
     - uses: julia-actions/setup-julia@v2
@@ -23,10 +23,11 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
     - name: Checkout gh-pages branch
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: gh-pages
         path: gh-pages
+        token: ${{ github.token }}
     - name: Insert navbar
       uses: TuringLang/actions/DocsNav@main
       with:
