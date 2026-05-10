@@ -8,7 +8,7 @@ runs:
     - uses: actions/checkout@v6
       with:
         clean: false
-    - uses: julia-actions/setup-julia@v2
+    - uses: julia-actions/setup-julia@v3
       with:
         version: '1'
     - uses: julia-actions/cache@v3
@@ -23,17 +23,19 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
     - name: Checkout gh-pages branch
+      if: ${{ github.event_name != 'pull_request' }}
       uses: actions/checkout@v6
       with:
         ref: gh-pages
         path: gh-pages
-        token: ${{ github.token }}
     - name: Insert navbar
+      if: ${{ github.event_name != 'pull_request' }}
       uses: TuringLang/actions/DocsNav@main
       with:
         doc-path: "gh-pages"
         navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/juliaspacephysics.github.io/refs/heads/main/ecosystem/Navbar.html"
     - name: Commit and push changes
+      if: ${{ github.event_name != 'pull_request' }}
       shell: bash
       working-directory: gh-pages
       run: |
