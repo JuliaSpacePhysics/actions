@@ -2,10 +2,15 @@ name: 'Build Documenter.jl site'
 author: 'JuliaSpacePhysics'
 description: 'Build and deploy Documenter.jl site, with a JuliaSpacePhysics navbar'
 
+inputs:
+  codecov_token:
+    description: 'Codecov upload token; when set, instrument the docs build and upload coverage (flag `docs`)'
+    default: ''
+
 runs:
   using: 'composite'
   steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         clean: false
     - uses: julia-actions/setup-julia@v3
@@ -19,12 +24,25 @@ runs:
         Pkg.develop(PackageSpec(path=pwd()))
         Pkg.instantiate()
     - uses: julia-actions/julia-buildpkg@v1
-    - uses: julia-actions/julia-docdeploy@v1
+    - name: Build and deploy docs
+      shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        cov=""
+        [[ -n "${{ inputs.codecov_token }}" ]] && cov="--code-coverage=user"
+        julia $cov --color=yes --project=docs docs/make.jl
+    - uses: julia-actions/julia-processcoverage@v1
+      if: ${{ inputs.codecov_token != '' }}
+    - uses: codecov/codecov-action@v7
+      if: ${{ inputs.codecov_token != '' }}
+      with:
+        files: lcov.info
+        flags: docs
+        token: ${{ inputs.codecov_token }}
     - name: Checkout gh-pages branch
       if: ${{ github.event_name != 'pull_request' }}
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         ref: gh-pages
         path: gh-pages
