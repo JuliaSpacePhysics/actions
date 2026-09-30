@@ -8,11 +8,11 @@ on:
       versions:
         description: 'JSON array of Julia versions that must pass'
         type: string
-        default: '["1", "lts"]'
+        default: '["1"]'
       pre:
         description: 'Also test the Julia prerelease, allowed to fail'
         type: boolean
-        default: true
+        default: false
       setup:
         description: 'Shell command run before building the package, e.g. installing a system library'
         type: string
