@@ -6,42 +6,43 @@ on:
   workflow_call:
     inputs:
       versions:
-        description: 'JSON array of Julia versions that must pass'
+        description: 'JSON array of Julia versions; "pre" is allowed to fail'
         type: string
         default: '["1"]'
-      pre:
-        description: 'Also test the Julia prerelease, allowed to fail'
-        type: boolean
-        default: false
+      os:
+        description: 'JSON array of runner images'
+        type: string
+        default: '["ubuntu-latest"]'
       setup:
-        description: 'Shell command run before building the package, e.g. installing a system library'
+        description: 'Bash command run after checkout, before building the package'
         type: string
         default: ''
 
 jobs:
   test:
-    name: Julia ${{ matrix.version }}
-    runs-on: ubuntu-latest
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    continue-on-error: ${{ matrix.allow_failure }}
+    continue-on-error: ${{ matrix.version == 'pre' }}
     strategy:
       fail-fast: false
       matrix:
         version: ${{ fromJSON(inputs.versions) }}
-        allow_failure: [false]
-        include: ${{ fromJSON(inputs.pre && '[{"version":"pre","allow_failure":true}]' || '[]') }}
+        os: ${{ fromJSON(inputs.os) }}
     steps:
       # Pkgimages default to the host CPU, and ubuntu-latest runners have mixed CPUs;
       # a fixed target keeps the restored cache loadable. x64-only target.
       - if: runner.arch == 'X64'
+        shell: bash
         run: echo "JULIA_CPU_TARGET=x86-64-v3" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
+      - if: inputs.setup != ''
+        shell: bash
+        run: ${{ inputs.setup }}
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
-      - if: inputs.setup != ''
-        run: ${{ inputs.setup }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
