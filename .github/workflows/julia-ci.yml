@@ -14,7 +14,7 @@ on:
         type: string
         default: '["ubuntu-latest"]'
       env:
-        description: 'KEY=VALUE lines exported to the build and test steps'
+        description: 'KEY=VALUE lines exported to the build and test steps; overrides the default JULIA_NUM_THREADS=auto'
         type: string
         default: ''
       setup:
@@ -39,11 +39,12 @@ jobs:
       - if: runner.arch == 'X64'
         shell: bash
         run: echo "JULIA_CPU_TARGET=x86-64-v3" >> "$GITHUB_ENV"
-      - if: inputs.env != ''
-        shell: bash
+      - shell: bash
         env:
           VARS: ${{ inputs.env }}
-        run: echo "$VARS" >> "$GITHUB_ENV"
+        run: |
+          echo "JULIA_NUM_THREADS=auto" >> "$GITHUB_ENV"
+          [ -n "$VARS" ] && echo "$VARS" >> "$GITHUB_ENV" || true
       - uses: actions/checkout@v7
       - if: inputs.setup != ''
         shell: bash
