@@ -6,7 +6,7 @@ on:
   workflow_call:
     inputs:
       versions:
-        description: 'JSON array of Julia versions; "pre" is allowed to fail'
+        description: 'JSON array of Julia versions; "pre" is allowed to fail, and is dropped while no prerelease is newer than the latest stable'
         type: string
         default: '["1"]'
       os:
@@ -23,15 +23,41 @@ on:
         default: ''
 
 jobs:
+  versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      versions: ${{ steps.resolve.outputs.versions }}
+    steps:
+      # Between release cycles "pre" resolves to the same Julia as "1"; drop it then.
+      # Fails open: any error in fetching or parsing keeps the input unchanged.
+      - id: resolve
+        shell: bash
+        env:
+          VERSIONS: ${{ inputs.versions }}
+        run: |
+          out=$(jq -c . <<<"$VERSIONS")
+          if jq -e 'index("pre")' <<<"$out" >/dev/null &&
+            redundant=$(curl -fsSL --retry 3 https://julialang-s3.julialang.org/bin/versions.json | jq '
+              def base: split("-")[0] | split(".") | map(tonumber);
+              to_entries
+              | ([.[] | select(.value.stable) | .key | base] | max) as $stable
+              | all(.[] | select(.value.stable | not) | .key | base; . <= $stable)') &&
+            [ "$redundant" = true ]; then
+            out=$(jq -c 'map(select(. != "pre")) as $r | if $r == [] then . else $r end' <<<"$out")
+          fi
+          echo "versions=$out" >> "$GITHUB_OUTPUT"
+
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    needs: versions
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     continue-on-error: ${{ matrix.version == 'pre' }}
     strategy:
       fail-fast: false
       matrix:
-        version: ${{ fromJSON(inputs.versions) }}
+        version: ${{ fromJSON(needs.versions.outputs.versions) }}
         os: ${{ fromJSON(inputs.os) }}
     steps:
       # Pkgimages default to the host CPU, and ubuntu-latest runners have mixed CPUs;
