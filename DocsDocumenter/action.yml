@@ -52,7 +52,7 @@ runs:
         path: gh-pages
     - name: Insert navbar
       if: ${{ github.event_name != 'pull_request' }}
-      uses: TuringLang/actions/DocsNav@main
+      uses: TuringLang/actions/DocsNav@v5
       with:
         doc-path: "gh-pages"
         navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/juliaspacephysics.github.io/refs/heads/main/ecosystem/Navbar.html"
