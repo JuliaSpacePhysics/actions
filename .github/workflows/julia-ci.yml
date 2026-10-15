@@ -21,6 +21,10 @@ on:
         description: 'Bash command run after checkout, before building the package'
         type: string
         default: ''
+      data-cache:
+        description: 'Paths (actions/cache syntax) of downloaded test data to cache; relative paths are under the repo root, and Pkg.test runs in test/'
+        type: string
+        default: ''
 
 jobs:
   versions:
@@ -79,6 +83,14 @@ jobs:
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
+      # Lets tests survive upstream data-server outages when the loader falls back to local files.
+      # Saved only on success, so a run that failed mid-download can't pin an incomplete cache.
+      - if: inputs.data-cache != ''
+        uses: actions/cache@v6
+        with:
+          path: ${{ inputs.data-cache }}
+          key: test-data-${{ runner.os }}-${{ hashFiles('test/**/*.jl') }}
+          restore-keys: test-data-${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
