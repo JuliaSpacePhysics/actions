@@ -64,7 +64,7 @@ jobs:
       # a fixed target keeps the restored cache loadable. x64-only target.
       - if: runner.arch == 'X64'
         shell: bash
-        run: echo "JULIA_CPU_TARGET=x86-64-v3" >> "$GITHUB_ENV"
+        run: echo "JULIA_CPU_TARGET=haswell" >> "$GITHUB_ENV"
       - shell: bash
         env:
           VARS: ${{ inputs.env }}

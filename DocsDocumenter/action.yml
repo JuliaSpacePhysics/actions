@@ -13,7 +13,7 @@ runs:
     # Same pkgimage-cache reason as .github/workflows/julia-ci.yml.
     - if: runner.arch == 'X64'
       shell: bash
-      run: echo "JULIA_CPU_TARGET=x86-64-v3" >> "$GITHUB_ENV"
+      run: echo "JULIA_CPU_TARGET=haswell" >> "$GITHUB_ENV"
     - uses: actions/checkout@v7
       with:
         clean: false
