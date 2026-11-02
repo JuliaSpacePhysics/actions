@@ -1,0 +1,46 @@
+name: Benchmark
+
+# Caller triggers on `pull_request_target` and `push` to the default branch, names its job `benchmark`,
+# and grants `permissions: {actions: write, contents: read, pull-requests: write}`; each job narrows these.
+on:
+  workflow_call:
+
+# Same pkgimage-cache reason as julia-ci.yml.
+env:
+  JULIA_CPU_TARGET: haswell
+
+jobs:
+  benchmark:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
+
+  # pull_request_target gets a read-only cache and runs fork code, so the cache
+  # that `benchmark` restores can only be saved from a trusted event.
+  seed-cache:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # julia-actions/cache deletes its old caches
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      # The key must match the one the AirspeedVelocity action restores in `benchmark`.
+      - uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=benchmark
+      - env:
+          URL: ${{ github.event.repository.clone_url }}
+          REV: ${{ github.event.repository.default_branch }}
+        run: |
+          export JULIA_NUM_THREADS=2
+          julia -e 'ENV["JULIA_PKG_PRECOMPILE_AUTO"]=0; using Pkg; Pkg.add(PackageSpec(name="AirspeedVelocity", version="0.6"))'
+          julia -e 'ENV["JULIA_PKG_PRECOMPILE_AUTO"]=0; using Pkg; Pkg.build("AirspeedVelocity")'
+          pkg=$(awk -F' *= *' '/^name *=/ {gsub(/"/,"",$2); print $2; exit}' Project.toml)
+          ~/.julia/bin/benchpkg "$pkg" --url="$URL" --rev="$REV" --output-dir="$(mktemp -d)"
