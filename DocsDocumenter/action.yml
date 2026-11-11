@@ -6,6 +6,9 @@ inputs:
   codecov_token:
     description: 'Codecov upload token; when set, instrument the docs build and upload coverage (flag `docs`)'
     default: ''
+  comment_timings:
+    description: 'Upsert a PR comment with per-page docs build time vs main (needs `pull-requests: write`)'
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -14,6 +17,8 @@ runs:
     - if: runner.arch == 'X64'
       shell: bash
       run: echo "JULIA_CPU_TARGET=haswell" >> "$GITHUB_ENV"
+    - shell: bash
+      run: echo "DOCS_PAGE_TIMINGS=$RUNNER_TEMP/docs-page-timings.tsv" >> "$GITHUB_ENV"
     - uses: actions/checkout@v7
       with:
         clean: false
@@ -35,7 +40,31 @@ runs:
       run: |
         cov=""
         [[ -n "${{ inputs.codecov_token }}" ]] && cov="--code-coverage=@$PWD"
-        julia $cov --color=yes --project=docs docs/make.jl
+        julia $cov --color=yes --project=docs -L "$GITHUB_ACTION_PATH/page_timings.jl" docs/make.jl
+    # Baseline is build-timings.tsv on gh-pages, recorded by main pushes below.
+    - name: Report page build time
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MARKER: '<!-- docs-page-timings -->'
+        PR: ${{ github.event.pull_request.number }}
+        COMMENT: ${{ inputs.comment_timings == 'true' && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork }}
+      run: |
+        [[ -s $DOCS_PAGE_TIMINGS ]] || exit 0
+        gh api "repos/$GITHUB_REPOSITORY/contents/build-timings.tsv?ref=gh-pages" \
+          -H "Accept: application/vnd.github.raw" > "$RUNNER_TEMP/base.tsv" || : > "$RUNNER_TEMP/base.tsv"
+        "$GITHUB_ACTION_PATH/page_timings.sh" "$DOCS_PAGE_TIMINGS" "$RUNNER_TEMP/base.tsv" > "$RUNNER_TEMP/timings.md"
+        cat "$RUNNER_TEMP/timings.md" >> "$GITHUB_STEP_SUMMARY"
+        [[ $COMMENT == true ]] || exit 0
+        { echo "$MARKER"; cat "$RUNNER_TEMP/timings.md"; } > "$RUNNER_TEMP/comment.md"
+        id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+               --jq "[.[] | select(.body | startswith(\"$MARKER\"))] | .[0].id // empty")
+        if [[ -n $id ]]; then
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" --silent
+        else
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@"$RUNNER_TEMP/comment.md" --silent
+        fi
     - uses: julia-actions/julia-processcoverage@v1
       if: ${{ inputs.codecov_token != '' }}
     - uses: codecov/codecov-action@v7
@@ -56,6 +85,10 @@ runs:
       with:
         doc-path: "gh-pages"
         navbar-url: "https://raw.githubusercontent.com/JuliaSpacePhysics/juliaspacephysics.github.io/refs/heads/main/ecosystem/Navbar.html"
+    - name: Record page build time baseline
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      shell: bash
+      run: if [[ -s $DOCS_PAGE_TIMINGS ]]; then cp "$DOCS_PAGE_TIMINGS" gh-pages/build-timings.tsv; fi
     - name: Commit and push changes
       if: ${{ github.event_name != 'pull_request' }}
       shell: bash
@@ -65,7 +98,7 @@ runs:
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
           git add -A
-          git commit -m "Update navbar (automated)"
+          git commit -m "Update navbar and page build times (automated)"
           git push
         else
           echo "No changes to commit"
