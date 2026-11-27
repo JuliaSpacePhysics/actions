@@ -1,8 +1,17 @@
 name: Benchmark
 
-# Caller triggers on `pull_request` and `push` to the default branch, names its job `benchmark`,
-# and grants `permissions: {actions: write, contents: read}`; each job narrows these.
-# PR code runs here without write access; benchmark-comment.yml posts the results.
+# Benchmarks PRs against the default branch with a read-only token; benchmark-comment.yml
+# posts the results. Caller, `.github/workflows/Benchmark.yml`:
+#
+#   name: Benchmark
+#   on:
+#     pull_request:
+#     push:
+#       branches: [main]
+#   jobs:
+#     benchmark:
+#       uses: JuliaSpacePhysics/actions/.github/workflows/benchmark.yml@main
+#       permissions: {actions: write, contents: read}
 on:
   workflow_call:
 

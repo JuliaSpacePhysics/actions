@@ -1,8 +1,18 @@
 name: Benchmark comment
 
-# Posts the results of benchmark.yml on the PR. Caller triggers on
-# `workflow_run: {workflows: [Benchmark], types: [completed]}` and grants
-# `permissions: {actions: read, pull-requests: write}`.
+# Posts benchmark.yml's results on the PR; active once on the default branch (`workflow_run`).
+# Caller, `.github/workflows/BenchmarkComment.yml`:
+#
+#   name: Benchmark comment
+#   on:
+#     workflow_run:
+#       workflows: [Benchmark]
+#       types: [completed]
+#   jobs:
+#     comment:
+#       uses: JuliaSpacePhysics/actions/.github/workflows/benchmark-comment.yml@main
+#       permissions: {actions: read, pull-requests: write}
+#
 # Not a job in benchmark.yml: a caller must grant every job's permissions, even of skipped jobs.
 on:
   workflow_call:
