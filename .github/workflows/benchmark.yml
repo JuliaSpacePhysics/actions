@@ -17,9 +17,22 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The action runs the default branch's script on both revisions; until that branch
+      # has one (the PR adding benchmarks), benchmark the PR head alone on its own script.
+      - id: revs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/contents/benchmark/benchmarks.jl?ref=$BASE" --silent 2>/dev/null; then
+            echo "rev=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
         with:
           job-summary: 'true' # writes body.md instead of commenting
+          rev: ${{ steps.revs.outputs.rev }}
+          bench-on: ${{ steps.revs.outputs.rev }}
       - env:
           PR: ${{ github.event.pull_request.number }}
         run: |
