@@ -1,0 +1,43 @@
+name: Benchmark comment
+
+# Posts the results of benchmark.yml on the PR. Caller triggers on
+# `workflow_run: {workflows: [Benchmark], types: [completed]}` and grants
+# `permissions: {actions: read, pull-requests: write}`.
+# Not a job in benchmark.yml: a caller must grant every job's permissions, even of skipped jobs.
+on:
+  workflow_call:
+
+jobs:
+  # The artifact was produced by PR code, so its contents are untrusted: the PR number
+  # is checked against the run's head SHA, and the body is only posted as text.
+  comment:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # download the artifact
+      pull-requests: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          dir="$RUNNER_TEMP/benchmark-comment"
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n benchmark-comment -D "$dir"
+          pr=$(<"$dir/pr")
+          [[ $pr =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number"; exit 1; }
+          # A newer push makes these results stale; that push's own run will comment.
+          if [[ $(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq .head.sha) != "$HEAD_SHA" ]]; then
+            echo "::notice::PR #$pr head moved past $HEAD_SHA; not commenting"
+            exit 0
+          fi
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate \
+                 --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Benchmark Results")))] | .[0].id // empty')
+          if [[ -n $id ]]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$dir/body.md" --silent
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" -F body=@"$dir/body.md" --silent
+          fi

@@ -1,7 +1,8 @@
 name: Benchmark
 
-# Caller triggers on `pull_request_target` and `push` to the default branch, names its job `benchmark`,
-# and grants `permissions: {actions: write, contents: read, pull-requests: write}`; each job narrows these.
+# Caller triggers on `pull_request` and `push` to the default branch, names its job `benchmark`,
+# and grants `permissions: {actions: write, contents: read}`; each job narrows these.
+# PR code runs here without write access; benchmark-comment.yml posts the results.
 on:
   workflow_call:
 
@@ -11,15 +12,28 @@ env:
 
 jobs:
   benchmark:
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      contents: read
     steps:
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
+        with:
+          job-summary: 'true' # writes body.md instead of commenting
+      - env:
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir "$RUNNER_TEMP/benchmark-comment"
+          cp body.md "$RUNNER_TEMP/benchmark-comment/"
+          echo "$PR" > "$RUNNER_TEMP/benchmark-comment/pr"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-comment # read by benchmark-comment.yml
+          path: ${{ runner.temp }}/benchmark-comment
+          retention-days: 7
 
-  # pull_request_target gets a read-only cache and runs fork code, so the cache
-  # that `benchmark` restores can only be saved from a trusted event.
+  # PR runs save caches only to their own PR's scope, so the cache that `benchmark`
+  # restores must be saved from the default branch.
   seed-cache:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
